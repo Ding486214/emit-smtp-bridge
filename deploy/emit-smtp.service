@@ -1,0 +1,41 @@
+[Unit]
+Description=Emit SMTP Bridge (SMTP -> vsllm.cc Emit HTTP API)
+Documentation=https://vsllm.cc/emit/llms.txt
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=emit-smtp
+Group=emit-smtp
+WorkingDirectory=/opt/emit-smtp
+EnvironmentFile=/etc/emit-smtp/env
+ExecStart=/usr/bin/node /opt/emit-smtp/index.mjs
+Restart=always
+RestartSec=5
+
+# 基础加固
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+# 资源限制
+LimitNOFILE=4096
+MemoryMax=512M
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=emit-smtp
+
+[Install]
+WantedBy=multi-user.target

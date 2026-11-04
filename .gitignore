@@ -1,0 +1,26 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# 密钥 / 本地配置（严禁提交）
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.crt
+
+# 日志
+*.log
+logs/
+
+# 编辑器与系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 构建产物
+dist/
+coverage/
+*.tgz

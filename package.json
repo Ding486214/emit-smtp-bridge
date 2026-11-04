@@ -1,0 +1,46 @@
+{
+  "name": "emit-smtp-bridge",
+  "version": "1.0.0",
+  "description": "把任意 SMTP 客户端接到 vsllm.cc 的 Emit 邮件 HTTP API（Resend 兼容）——SMTP ⇄ HTTP 桥接服务",
+  "type": "module",
+  "main": "src/index.mjs",
+  "bin": {
+    "emit-smtp-bridge": "src/index.mjs"
+  },
+  "files": [
+    "src",
+    "deploy",
+    "scripts",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "node src/index.mjs",
+    "dev": "node --watch src/index.mjs",
+    "test": "node --test test/*.test.mjs",
+    "test:watch": "node --test --watch test/*.test.mjs",
+    "client": "node scripts/send-test.mjs",
+    "lint": "node --check src/index.mjs && node --check src/server.mjs && node --check src/emit-client.mjs && node --check src/config.mjs && node --check src/logger.mjs && node --check src/rate-limit.mjs"
+  },
+  "keywords": [
+    "smtp",
+    "email",
+    "bridge",
+    "resend",
+    "emit",
+    "vsllm",
+    "smtp-server",
+    "self-hosted"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "mailparser": "^3.14.1",
+    "smtp-server": "^3.21.3"
+  },
+  "devDependencies": {
+    "nodemailer": "^10.3.1"
+  }
+}

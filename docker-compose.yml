@@ -1,0 +1,31 @@
+services:
+  emit-smtp-bridge:
+    build: .
+    image: emit-smtp-bridge:latest
+    container_name: emit-smtp-bridge
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      EMIT_SMTP_HOST: 0.0.0.0
+      EMIT_SMTP_PORT: 587
+    ports:
+      - "587:587"
+      # 隐式 TLS（配了 EMIT_TLS_CERT/EMIT_TLS_KEY 并挂载证书后启用）
+      # - "465:465"
+    volumes:
+      # 证书（可选）
+      # - ./certs:/etc/emit-smtp/certs:ro
+    # 基础加固
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
