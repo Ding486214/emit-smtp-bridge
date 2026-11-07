@@ -10,7 +10,7 @@ User=emit-smtp
 Group=emit-smtp
 WorkingDirectory=/opt/emit-smtp
 EnvironmentFile=/etc/emit-smtp/env
-ExecStart=/usr/bin/node /opt/emit-smtp/index.mjs
+ExecStart=/usr/bin/node /opt/emit-smtp/src/index.mjs
 Restart=always
 RestartSec=5
 
@@ -25,9 +25,13 @@ ProtectControlGroups=true
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 RestrictNamespaces=true
 LockPersonality=true
-MemoryDenyWriteExecute=true
 SystemCallFilter=@system-service
 SystemCallErrorNumber=EPERM
+
+# 注意：不要启用 MemoryDenyWriteExecute=true。
+# 它禁止创建可执行内存页，V8 的 JIT 一申请就 TRAP，进程会以
+# "Check failed: 12 == (*__errno_location ())" / status=5/TRAP 反复崩。
+# （若确实需要该限制，可给 Node 加 --jitless，但那样 WebAssembly 也不可用。）
 
 # 资源限制
 LimitNOFILE=4096

@@ -1,6 +1,9 @@
 /**
  * Emit HTTP 客户端：把 SMTP 解析结果投递到 Emit 的 POST /emails。
  */
+import { request as httpsRequest } from 'node:https';
+import { request as httpRequest } from 'node:http';
+import { URL } from 'node:url';
 import { simpleParser } from 'mailparser';
 
 /** 把 mailparser 的解析结果映射成 Emit /emails 请求体。 */
@@ -64,26 +67,63 @@ export async function parseMessage(raw) {
 
 /**
  * 调用 Emit 发送接口。
+ *
+ * 刻意使用 node:https / node:http 而不是全局 fetch：fetch 由 undici 实现，
+ * 依赖 WebAssembly 编译 llhttp，而 --jitless 模式下 WebAssembly 不可用。
+ * 小内存 VPS 上账要关 JIT（见 deploy/README），所以这里不能依赖 WASM。
+ *
  * @returns {{ok: boolean, status: number, body: object, id?: string}}
  */
-export async function sendToEmit(payload, { apiKey, url, timeoutMs = 30_000 } = {}) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+export function sendToEmit(payload, { apiKey, url, timeoutMs = 30_000 } = {}) {
+  return new Promise((resolve, reject) => {
+    let target;
+    try {
+      target = new URL(url);
+    } catch (err) {
+      reject(new Error(`EMIT_API_URL 不是合法 URL: ${url}`));
+      return;
+    }
+
+    const body = JSON.stringify(payload);
+    const isHttps = target.protocol === 'https:';
+    const doRequest = isHttps ? httpsRequest : httpRequest;
+
+    const req = doRequest(
+      {
+        protocol: target.protocol,
+        hostname: target.hostname,
+        port: target.port || (isHttps ? 443 : 80),
+        path: `${target.pathname}${target.search}`,
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body),
+        },
+        timeout: timeoutMs,
       },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
+      (res) => {
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () => {
+          const text = Buffer.concat(chunks).toString('utf8');
+          let parsed;
+          try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
+          const status = res.statusCode || 0;
+          resolve({
+            ok: status >= 200 && status < 300,
+            status,
+            body: parsed,
+            id: parsed?.id,
+          });
+        });
+      },
+    );
+
+    req.on('timeout', () => {
+      req.destroy(new Error(`Emit 请求超时 (${timeoutMs}ms)`));
     });
-    const text = await res.text();
-    let body;
-    try { body = JSON.parse(text); } catch { body = { raw: text }; }
-    return { ok: res.ok, status: res.status, body, id: body?.id };
-  } finally {
-    clearTimeout(timer);
-  }
+    req.on('error', reject);
+    req.end(body);
+  });
 }

@@ -1,6 +1,6 @@
 {
   "name": "emit-smtp-bridge",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "把任意 SMTP 客户端接到 vsllm.cc 的 Emit 邮件 HTTP API（Resend 兼容）——SMTP ⇄ HTTP 桥接服务",
   "type": "module",
   "main": "src/index.mjs",

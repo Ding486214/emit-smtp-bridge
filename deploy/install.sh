@@ -32,7 +32,7 @@ fi
 
 echo "==> 2/6 安装应用与依赖"
 mkdir -p "$APP_DIR"
-cp -f "$SRC_DIR/src/"*.mjs "$APP_DIR/"
+cp -rf "$SRC_DIR/src" "$APP_DIR/"
 cp -f "$SRC_DIR/package.json" "$APP_DIR/"
 cd "$APP_DIR"
 npm install --omit=dev --no-audit --no-fund
@@ -70,6 +70,16 @@ cat <<'EOF'
                （EMIT_API_KEY / EMIT_SMTP_USER / EMIT_SMTP_PASS）
   2) 重启:    sudo systemctl restart emit-smtp
   3) 看日志:  sudo journalctl -u emit-smtp -f
-  4) 放行:    sudo ufw allow 587/tcp        # 或 465/tcp
-  5) 客户端:  服务器=IP 端口=587 加密=STARTTLS 开启认证
+  4) 放行:    sudo ufw allow 2465/tcp
+
+  ⚠ 端口注意：绝大多数云厂商（阿里云/腾讯云/AWS/GCP…）默认封禁
+     25 / 465 / 587 这些垃圾邮件高危端口，服务器上 ufw 放行了也连不通。
+     请优先使用高位端口（如 2465），并在云控制台安全组里放行。
+     若坚持用 587 等 <1024 端口，需要给服务加绑定能力：
+       mkdir -p /etc/systemd/system/emit-smtp.service.d
+       printf '[Service]\nAmbientCapabilities=CAP_NET_BIND_SERVICE\n' \
+         > /etc/systemd/system/emit-smtp.service.d/caps.conf
+       systemctl daemon-reload && systemctl restart emit-smtp
+
+  5) 客户端:  服务器=IP 端口=2465 加密=SSL/TLS 开启认证
 EOF

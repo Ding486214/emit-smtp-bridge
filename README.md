@@ -86,9 +86,56 @@ node scripts/send-test.mjs delivered@resend.dev
 
 - **AUTH 只在 TLS 上可用**（`allowInsecureAuth: false`）。明文连接无法认证。
 - **公网部署务必设置 `EMIT_SMTP_USER` / `EMIT_SMTP_PASS`**，否则任何能连上的人都能借用你的 API key 发信。
-- systemd 单元已启用 `ProtectSystem=strict`、`NoNewPrivileges`、`MemoryDenyWriteExecute`、`SystemCallFilter=@system-service`，以独立低权用户 `emit-smtp` 运行。
+- systemd 单元已启用 `ProtectSystem=strict`、`NoNewPrivileges`、`SystemCallFilter=@system-service`，以独立低权用户 `emit-smtp` 运行。
+- ⚠ **不要给这个服务加 `MemoryDenyWriteExecute=true`**：它禁止创建可执行内存页，Node 的 V8 JIT 一申请就 SIGTRAP 崩掉（旧版本单元文件里曾有这一条，已移除）。
 - 每 IP 限速默认 120 封/小时，超限返回 SMTP `451`。
 - **`.env` 与证书已被 `.gitignore` 排除，请勿把密钥提交到仓库。**
+
+## 部署踩坑（真实案例）
+
+以下是实际在 Debian 12 / 2C2G 云主机上部署时踩到的坑，按出现顺序：
+
+### 1. 进程反复 `status=5/TRAP` 崩溃
+
+```
+# Fatal error in , line 0
+# Check failed: 12 == (*__errno_location ()).
+  v8::internal::MemoryAllocator::SetPermissionsOnExecutableMemoryChunk
+```
+
+`errno 12 = ENOMEM`，缺的**不是内存，是「可执行内存页」的权限**。元凶是 systemd 单元里的
+`MemoryDenyWriteExecute=true`（seccomp 禁止 `mprotect(PROT_EXEC)`）。
+
+- **正解**：删掉这一条（本仓库单元文件已修正）。
+- **如果要保留该限制**：给 Node 加 `--jitless`，但注意 `--jitless` 会同时禁用 WebAssembly，
+  而 Node 内置 `fetch`（undici）依赖 WASM 编 llhttp，会直接 `ReferenceError: WebAssembly is not defined`。
+  本项目的 Emit 客户端因此刻意改用 `node:https`，在 `--jitless` 下也能工作。
+
+### 2. 云厂商封禁 25 / 465 / 587
+
+阿里云、腾讯云、AWS、GCP 等默认封锁这些「垃圾邮件高危端口」，`ufw` 放行了**依然连不通**
+（从外部 `connect ETIMEDOUT`）。服务器上 `ss -tlnp` 能看到监听，但公网到不了。
+
+- **正解**：换高位端口（本仓库示例用 `2465`），并在云控制台安全组放行。
+- 顺带一提：Debian 自带的 exim4/postfix 常占用 `127.0.0.1:25` 和 `127.0.0.1:587`，
+  若想用这两个端口，需要绑定公网 IP（不与回环地址冲突）或先停掉系统 MTA。
+
+### 3. 非 root 用户绑定 <1024 端口报 `EACCES`
+
+```
+[ERROR] server error: listen EACCES: permission denied 0.0.0.0:465
+```
+
+- **正解**：用高位端口；或给服务加 `CAP_NET_BIND_SERVICE`（见 `deploy/install.sh` 结尾提示）。
+
+### 4. 自签证书权限
+
+服务以 `emit-smtp` 用户运行，`/etc/emit-smtp/key.pem` 若是 `root:root 600` 会读不到：
+
+```bash
+chown emit-smtp:emit-smtp /etc/emit-smtp/key.pem
+chmod 600 /etc/emit-smtp/key.pem
+```
 
 ## 已知限制
 
