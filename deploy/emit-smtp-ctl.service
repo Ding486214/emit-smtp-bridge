@@ -1,0 +1,31 @@
+[Unit]
+Description=Emit SMTP Bridge privileged control helper (root)
+Before=emit-smtp.service
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/node /opt/emit-smtp/src/ctl-server.mjs
+Environment=CTL_ENV_FILE=/etc/emit-smtp/env
+Environment=CTL_SOCK=/run/emit-smtp/ctl.sock
+Environment=CTL_SERVICE=emit-smtp
+RuntimeDirectory=emit-smtp
+RuntimeDirectoryMode=0755
+Restart=always
+RestartSec=3
+
+# 只做三件事：读写 env、重启主服务、读日志。最小化风险面。
+# ProtectSystem=full 会把 /etc 设为只读，必须给 env 目录开写豁免
+ProtectSystem=full
+ReadWritePaths=/etc/emit-smtp
+ProtectHome=true
+NoNewPrivileges=true
+RestrictNamespaces=true
+LockPersonality=true
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=emit-smtp-ctl
+
+[Install]
+WantedBy=multi-user.target

@@ -2,6 +2,23 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.1.0] - 2026-11-08
+
+### 新增
+
+- **Web 管理台**（`web/` + `src/web-server.mjs`）：登录后网页发信（含附件）、SMTP 参数完整管理、发送历史、系统日志
+- **前后端分离**：前端纯静态（无构建）+ 后端 REST API（`/api/login` `/api/send` `/api/smtp` `/api/status` `/api/logs` `/api/history` `/api/webpass`）
+- **认证与会话**：`src/web-auth.mjs`（scrypt 哈希、HMAC 签名会话、CSRF，零第三方依赖）
+- **权限分离守护进程**：`src/ctl-server.mjs` + `deploy/emit-smtp-ctl.service`，以 root 运行、Unix socket 白名单命令（读/写 env、重启服务、读日志），主服务保持低权沙箱
+- **发送历史**：`src/history.mjs`（追加式 JSONL，超 2MB 轮转）
+- `deploy/gen-web-credentials.mjs`：生成 web 登录密码的 scrypt 哈希与盐
+
+### 变更
+
+- `index.mjs` 同进程同时启动 SMTP 与 Web 服务（设 `WEB_PORT` 才启用 Web）
+- `nodemailer` 提升为运行时依赖（Web 发信用它组装 MIME，与 SMTP 共用一条投递链路）
+- `install.sh` 增加：复制 `web/`、生成自签证书与 web 凭据、注册第二个 systemd 服务
+
 ## [1.0.1] - 2026-11-07
 
 ### 修复

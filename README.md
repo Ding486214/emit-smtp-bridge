@@ -2,13 +2,17 @@
 
 > 把任意支持 SMTP 的客户端（Outlook、Thunderbird、WordPress、脚本、老旧系统……）接到 [vsllm.cc 的 Emit 邮件 API](https://vsllm.cc/emit/llms.txt)。
 
-**SMTP ⇄ HTTP 桥接服务**。Emit 只提供 HTTP API（Resend 兼容），没有任何 SMTP 端口，所以需要一个小服务把 SMTP 会话翻译成 `POST /emails`。
+**SMTP ⇄ HTTP 桥接服务 + Web 管理台**。Emit 只提供 HTTP API（Resend 兼容），没有任何 SMTP 端口，所以需要一个小服务把 SMTP 会话翻译成 `POST /emails`；同时附一个带登录的 Web 界面，用来网页发信、管理 SMTP 参数、看发送历史与服务日志。
 
 ```
-┌──────────────┐   SMTP 587 / 465   ┌────────────────────┐    HTTPS     ┌────────────────┐
+┌──────────────┐   SMTP 2465/465   ┌────────────────────┐    HTTPS     ┌────────────────┐
 │  邮件客户端   │ ─────────────────▶ │  emit-smtp-bridge  │ ───────────▶ │ vsllm.cc/emit │
 │ Outlook 等   │                    │ (Node + systemd)   │              │   /v1/emails   │
-└──────────────┘                    └────────────────────┘              └────────────────┘
+└──────────────┘                    └─────────┬──────────┘              └────────────────┘
+                                              │ HTTPS (Web 管理台)
+                                    ┌─────────▼──────────┐
+                                    │  浏览器 网页发信    │
+                                    └────────────────────┘
 ```
 
 ---
@@ -16,8 +20,9 @@
 ## 特性
 
 - **开箱即用**：填一个 Emit API key 就能用，任何 SMTP 客户端连上即可发信
-- **单进程零外部依赖**：只需 Node.js ≥ 20，systemd / Docker 都提供
+- **Web 管理台**：登录后网页发信（含附件）、SMTP 参数管理（改端口/密码/重启/看日志）、发送历史
 - **安全默认值**：AUTH 只允许在 TLS 上进行、每 IP 限速、并发与体积限制、systemd 沙箱加固
+- **权限分离**：Web「完整管理」通过独立的 root 守护进程 `emit-smtp-ctl`（Unix socket + 白名单命令），主服务保持低权用户运行
 - **错误可观测**：Emit 的错误码（如收件人当日超限 429）会以真实原因回传给 SMTP 客户端
 - **完整 MIME 支持**：HTML / 纯文本 / 附件 / cc / bcc / reply_to / 自定义头
 
@@ -50,6 +55,27 @@ EMIT_API_KEY=re_xxx EMIT_SMTP_PORT=2587 npm start
 # 另一个终端发一封测试
 node scripts/send-test.mjs delivered@resend.dev
 ```
+
+## Web 管理台
+
+设置了 `WEB_PORT` 后，`index.mjs` 会在同进程内同时启动一个带登录的 Web 界面：
+
+- **发邮件**：网页填收件人/主题/正文/附件，点发送即走 Emit（复用与 SMTP 完全相同的 MIME→Emit 链路）
+- **SMTP 设置**：查看/修改监听地址、端口、TLS、认证账号密码、限速；重启服务；看 `journalctl` 日志
+- **发送历史**：最近发送记录（追加式 JSONL 文件）
+- **登录**：单管理员，scrypt 密码哈希 + HMAC 签名会话 + CSRF
+
+关键环境变量：
+
+| 变量 | 说明 |
+|---|---|
+| `WEB_PORT` | Web 端口（默认不启用） |
+| `WEB_USER` / `WEB_PASS_HASH` / `WEB_SALT` | 登录账号与 scrypt 哈希（`deploy/gen-web-credentials.mjs` 生成） |
+| `WEB_SESSION_SECRET` | 会话签名密钥（部署脚本自动生成） |
+| `CTL_SOCK` | root 守护进程 socket，默认 `/run/emit-smtp/ctl.sock` |
+
+> 「完整管理」（改端口/改密码/重启/看日志）需要 root 权限，由独立的 `emit-smtp-ctl` 服务
+> 通过 Unix socket 提供白名单命令，主服务保持低权沙箱运行——不要为了省事把主服务改成 root。
 
 ## 客户端配置
 

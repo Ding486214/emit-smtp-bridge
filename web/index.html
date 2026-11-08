@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Emit SMTP 桥 · 管理台</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <header id="topbar" class="hidden">
+    <div class="brand">Emit SMTP 桥</div>
+    <nav>
+      <a href="#compose">发邮件</a>
+      <a href="#history">历史</a>
+      <a href="#smtp">SMTP 设置</a>
+    </nav>
+    <div class="user">
+      <span id="whoami"></span>
+      <button id="logout-btn" class="link">退出</button>
+    </div>
+  </header>
+
+  <main id="app"></main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

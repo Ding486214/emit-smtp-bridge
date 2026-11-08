@@ -13,6 +13,7 @@ node_modules/
 # 日志
 *.log
 logs/
+data/
 
 # 编辑器与系统
 .vscode/

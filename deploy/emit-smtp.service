@@ -1,7 +1,9 @@
 [Unit]
-Description=Emit SMTP Bridge (SMTP -> vsllm.cc Emit HTTP API)
+Description=Emit SMTP Bridge (SMTP -> vsllm.cc Emit HTTP API) + Web 管理台
 Documentation=https://vsllm.cc/emit/llms.txt
-After=network-online.target
+# 只用 After 做排序，不要 Wants：否则 web 里“重启”会在 ctl 服务内部
+# 触发对 ctl 自身的 start job，systemd 会以非零退出（尽管重启实际成功）。
+After=network-online.target emit-smtp-ctl.service
 Wants=network-online.target
 
 [Service]
@@ -28,10 +30,12 @@ LockPersonality=true
 SystemCallFilter=@system-service
 SystemCallErrorNumber=EPERM
 
+# 可写路径：发送历史 + ctl socket 所在目录
+ReadWritePaths=/opt/emit-smtp/data /run/emit-smtp
+
 # 注意：不要启用 MemoryDenyWriteExecute=true。
 # 它禁止创建可执行内存页，V8 的 JIT 一申请就 TRAP，进程会以
 # "Check failed: 12 == (*__errno_location ())" / status=5/TRAP 反复崩。
-# （若确实需要该限制，可给 Node 加 --jitless，但那样 WebAssembly 也不可用。）
 
 # 资源限制
 LimitNOFILE=4096
